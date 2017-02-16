@@ -5,21 +5,131 @@ output:
     keep_md: true
 ---
 
+### Load the required libraries:
+```{r}
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(chron)
+```
 
 ## Loading and preprocessing the data
-
+```{r}
+zipFile <- "activity.zip"
+csvFile <- "activity.csv"
+if(!file.exists(file.path(csvFile))){unzip(file.path(zipFile))}
+activity <- read.csv(csvFile, stringsAsFactors = FALSE)
+head(activity)
+```
 
 
 ## What is mean total number of steps taken per day?
+```{r}
+dates <- activity$date
+steps <- activity$steps
+stepsByDate <- aggregate(steps, list(dates), FUN = sum)
+head(stepsByDate)
+names(stepsByDate)
+colnames(stepsByDate) <- c("Date", "TotalSteps")
+names(stepsByDate)
+```
 
+### 1. Make a histogram of the total number of steps taken each day
+```{r}
+hist(stepsByDate$TotalSteps, xlab = "Total Steps per Day", main = "Histogram of total steps per day")
+```
+
+### 2. Calculate and report the mean and median total number of steps taken per day
+```{r}
+mean(stepsByDate$TotalSteps, na.rm = TRUE)
+median(stepsByDate$TotalSteps, na.rm = TRUE)
+```
 
 
 ## What is the average daily activity pattern?
 
+### 1. Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+```{r}
+avgStepsByInt <- activity %>% filter(!is.na(steps)) %>% group_by(interval) %>%summarize(avgSteps = mean(steps))
+head(avgStepsByInt)
+ggplot(avgStepsByInt, aes(interval, avgSteps)) + geom_line() + ggtitle("Average Daily activity pattern by Interval")
+```
+
+###2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+```{r}
+filter(avgStepsByInt, avgSteps == max(avgStepsByInt$avgSteps))
+
+```
 
 
 ## Imputing missing values
 
+### 1. Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+```{r}
+sum(is.na(activity$steps))
+
+```
+
+### 2. Devise a strategy for filling in all of the missing values in the dataset. 
+The strategy does not need to be sophisticated. For example, you could use
+the mean/median for that day, or the mean for that 5-minute interval, etc.
+
+### 3. Create a new dataset that is equal to the original dataset but with the missing data filled in.
+```{r}
+completeActivity <- activity
+length(which(is.na(completeActivity$steps)))
+head(completeActivity)
+completeActivity$steps[which(is.na(completeActivity$steps))] <- avgStepsByInt$avgSteps
+length(which(is.na(completeActivity$steps)))
+head(completeActivity)
+
+```
+
+### 4. Make a histogram of the total number of steps taken each day and 
+Calculate and report the mean and median total number of steps taken per day. Do
+these values differ from the estimates from the first part of the assignment?
+What is the impact of imputing missing data on the estimates of the total
+daily number of steps?
+
+```{r}
+completeStepsByDate <- aggregate(completeActivity$steps, list(completeActivity$date), FUN = sum)
+names(completeStepsByDate)
+colnames(completeStepsByDate) <- c("Date", "TotalSteps")
+head(completeStepsByDate)
+hist(completeStepsByDate$TotalSteps, xlab = "Total Steps per Day", main = "Histogram of total steps per day")
+
+mean(completeStepsByDate$TotalSteps, na.rm = TRUE)
+median(completeStepsByDate$TotalSteps, na.rm = TRUE)
+
+```
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+###1. Create a new factor variable in the dataset with two levels - "weekday" and "weekend" 
+indicating whether a given date is a weekday or weekend day.
+
+```{r}
+str(completeActivity)
+completeActivity$date <- as.Date(completeActivity$date)
+str(completeActivity)
+completeActivity$Day <- weekdays(completeActivity$date)
+str(completeActivity)
+completeActivity$DayType <- ifelse(is.weekend(completeActivity$date), "Weekend", "Weekday")
+str(completeActivity)
+head(completeActivity)
+
+```
+
+
+### 2. Make a panel plot containing a time series plot (i.e. type = "l")
+of the 5-minute interval (x-axis) and the average number of steps taken, averaged
+across all weekday days or weekend days (y-axis).
+
+```{r}
+byDayType <- completeActivity %>% group_by(interval, DayType) %>% summarize(steps = mean(steps))
+head(byDayType)
+ggplot(byDayType, aes(x=interval, y=steps, color=DayType)) + geom_line() + facet_wrap(~DayType, ncol=1, nrow=2)
+
+```
+
